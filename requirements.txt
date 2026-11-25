@@ -1,0 +1,7 @@
+torch
+torchvision
+kornia==0.7.3
+torchattacks==3.5.1
+numpy
+pandas
+openpyxl

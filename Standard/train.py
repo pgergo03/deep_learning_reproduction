@@ -7,7 +7,17 @@ from torch import nn
 import pandas as pd
 import os
 import datetime
+import argparse
 from my_utils import bil_CIFAR10, Bil_layer
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--preproc", type=int, default=0)
+parser.add_argument("--bil", type=int, default=10)
+parser.add_argument("--noise", type=float, default=0.032)
+parser.add_argument("--noise_first", type=int, default=1)
+parser.add_argument("--epochs", type=int, default=80)
+parser.add_argument("--tag", default=None, help="model name suffix instead of the timestamp")
+args = parser.parse_args()
 
 
 def run_ef03():
@@ -16,14 +26,14 @@ def run_ef03():
     #the amount of bilateral filter iterations, if bil = 0 then there is no bilateral filtering
 
     now = datetime.datetime.now()
-    time = str(now.time())[0:8]
+    time = args.tag or str(now.time())[0:8]
     
     ########################################## Hyperparameters ###########################################
     batch_size = 64
-    epochs = 80
+    epochs = args.epochs
 
     #if a preprocessor layer is added in front of the NN
-    preproc = False
+    preproc = bool(args.preproc)
 
     #where the model should be saved
     model_dir = "./Models/"
@@ -34,7 +44,7 @@ def run_ef03():
     kernel_size = 5
 
     #the amount of bilateral filtering during inference; 0 is no bilateral filter 
-    bil = 10
+    bil = args.bil
 
     #the sigma space for all bilateral filters
     sigma_spatial = 10.
@@ -46,7 +56,7 @@ def run_ef03():
     color2 = 0.05
 
     #the variance of the inherent Gaussian noise; 0 is no noise
-    noise = 0.032
+    noise = args.noise
 
     #the sigma space for Gaussian blurring; 0 is no Gaussian blurring
     blur = 0.
@@ -124,7 +134,7 @@ def run_ef03():
     loss_fn = nn.CrossEntropyLoss()
     
 
-    bil_layer = Bil_layer(kernel_size=kernel_size, bil = bil, sigma_color=sigma_color, sigma_space=sigma_spatial, blur = blur, noise = noise, median=med, sup = sup, JPEG=Jpeg,  q = q, device=device).to(device)
+    bil_layer = Bil_layer(kernel_size=kernel_size, bil = bil, sigma_color=sigma_color, sigma_space=sigma_spatial, blur = blur, noise = noise, median=med, sup = sup, JPEG=Jpeg,  q = q, device=device, noise_first=bool(args.noise_first)).to(device)
     if(preproc):    
         model = torch.nn.Sequential(bil_layer,model)
 

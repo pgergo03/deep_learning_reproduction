@@ -5,12 +5,26 @@ import pandas as pd
 import os
 import datetime
 import torchattacks as ta
+import argparse
 from my_utils import bil_CIFAR10, Bil_layer
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--preproc", type=int, default=1)
+parser.add_argument("--bil", type=int, default=10)
+parser.add_argument("--noise", type=float, default=0.032)
+parser.add_argument("--noise_first", type=int, default=1)
+parser.add_argument("--bil_m", type=int, default=10)
+parser.add_argument("--time", nargs="+", default=["14:44:15"])
+parser.add_argument("--c", type=float, nargs="+", default=[1,1.2,1.4,1.6,1.8,2])
+args = parser.parse_args()
 
 
 def test( model, device, test_loader):
    
-    correct = [0,0,0,0,0,0,0]
+    #the different C we are testing for
+    c = args.c
+
+    correct = [0]*(len(c)+1)
 
     for data, target in test_loader:
             data,target = data.to(device), target.to(device)
@@ -21,11 +35,8 @@ def test( model, device, test_loader):
 
             correct[-1] += (final_true_mat[final_true_mat == True]).size(dim=0)
     
-    #the different C we are testing for
-    c = [1,1.2,1.4,1.6,1.8,2]
-
     att_l = [ta.CW(model = model,c = x) for x in c ]
-    l2 = [0,0,0,0,0,0]
+    l2 = [0]*len(c)
 
     # Loop over all examples in test set
     for data, target in test_loader:
@@ -60,20 +71,20 @@ batch_size=128
 path = str("./CW_adv/" + real_time)
 
 #if a preprocessor layer is added in front of the NN
-preproc = True
+preproc = bool(args.preproc)
 
 #the bilateral filter amount used for the training of the model
-bil_m = 10
+bil_m = args.bil_m
 
 #the times and directory of the models, here we can use multiple models at the same time
-time_list = ["14:44:15"]
+time_list = args.time
 model_dir = "./Models/"
 
 #size of the first bilateral filter kernel, of the gaussian kernel and of all median filtering kernels(following bilateral filters always uses 3)
 kernel_size = 5
 
 #the amount of bilateral filtering during inference; 0 is no bilateral filter 
-bil = 10
+bil = args.bil
 
 #the sigma space for all bilateral filters
 sigma_spatial = 10.
@@ -85,7 +96,7 @@ sigma_color = .5
 color2 = 0.05
 
 #the variance of the inherent Gaussian noise; 0 is no noise
-noise = 0.032
+noise = args.noise
 
 #the sigma space for Gaussian blurring; 0 is no Gaussian blurring
 blur = 0.
@@ -132,7 +143,7 @@ test_loader = DataLoader(cifartest, batch_size=batch_size, shuffle=True)
 model = models.efficientnet_b0().to(device)
 
 
-bil_layer = Bil_layer(kernel_size=kernel_size, bil = bil, sigma_color=sigma_color, sigma_space=sigma_spatial, blur = blur, noise = noise, median=med, sup = sup, JPEG=Jpeg,  q = q).to(device)
+bil_layer = Bil_layer(kernel_size=kernel_size, bil = bil, sigma_color=sigma_color, sigma_space=sigma_spatial, blur = blur, noise = noise, median=med, sup = sup, JPEG=Jpeg,  q = q, device=device, noise_first=bool(args.noise_first)).to(device)
 if(preproc):    
     model = torch.nn.Sequential(bil_layer,model)
     

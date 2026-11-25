@@ -8,9 +8,21 @@ import pandas as pd
 
 import os
 import datetime
+import argparse
 
 import torchattacks as ta
 from my_utils import bil_CIFAR10, Bil_layer
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--preproc", type=int, default=1)
+parser.add_argument("--bil", type=int, default=10)
+parser.add_argument("--noise", type=float, default=0.032)
+parser.add_argument("--noise_first", type=int, default=1)
+parser.add_argument("--color2", type=float, default=0.05)
+parser.add_argument("--bil_m", type=int, default=10)
+parser.add_argument("--time", default="14:44:15")
+parser.add_argument("--eps", type=float, nargs="+", default=list(np.array([0, .05, .1, .15, .2, .3, 0.5, 1])/10))
+args = parser.parse_args()
 
 class transform_layer(nn.Module):
     def __init__(self, transform):
@@ -134,20 +146,20 @@ batch_size=128
 path = str("./mult_adv/" + real_time)
 
 #if a preprocessor layer is added in front of the NN
-preproc = True
+preproc = bool(args.preproc)
 
 #the bilateral filter amount used for the training of the model
-bil_m = 10
+bil_m = args.bil_m
 
 #the time and directory of the model
-time ="14:44:15"
+time = args.time
 model_dir = "./Models/"
 
 #size of the first bilateral filter kernel, of the gaussian kernel and of all median filtering kernels(following bilateral filters always uses 3)
 kernel_size = 5
 
 #the amount of bilateral filtering during inference; 0 is no bilateral filter 
-bil = 10
+bil = args.bil
 
 #the sigma space for all bilateral filters
 sigma_spatial = 10.
@@ -156,10 +168,10 @@ sigma_spatial = 10.
 sigma_color = .5
 
 #the sigma range for all following bilateral filters
-color2 = 0.05
+color2 = args.color2
 
 #the variance of the inherent Gaussian noise; 0 is no noise
-noise = 0.032
+noise = args.noise
 
 #the sigma space for Gaussian blurring; 0 is no Gaussian blurring
 blur = 0.
@@ -180,7 +192,7 @@ q = 0
 transform = False
 
 #the epsilons used for all attack, for the APGD L2 we multiply them by 17
-epsilons = np.array([0, .05, .1, .15, .2, .3, 0.5, 1])/10
+epsilons = args.eps
 
 ############################################################################################################
 
@@ -205,7 +217,7 @@ test_loader = DataLoader(cifartest, batch_size=batch_size, shuffle=True)
 model = models.efficientnet_b0().to(device)
 
 
-bil_layer = Bil_layer(kernel_size=kernel_size, bil = bil, sigma_color=sigma_color, sigma_space=sigma_spatial, color2= color2, blur = blur, noise = noise, median=med, sup = sup, JPEG=Jpeg,  q = q).to(device)
+bil_layer = Bil_layer(kernel_size=kernel_size, bil = bil, sigma_color=sigma_color, sigma_space=sigma_spatial, color2= color2, blur = blur, noise = noise, median=med, sup = sup, JPEG=Jpeg,  q = q, device=device, noise_first=bool(args.noise_first)).to(device)
 if(preproc):    
     model = torch.nn.Sequential(bil_layer,model)
 
@@ -216,7 +228,6 @@ if(test_transform != None):
     model = torch.nn.Sequential(transform_layer(test_transform).to(device),model)
 model.eval()
 
-epsilons = np.array([0, .05, .1, .15, .2, .3, 0.5, 1])/10
 accuracies = []
 examples = []
 

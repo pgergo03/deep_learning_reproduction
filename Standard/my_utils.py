@@ -14,8 +14,9 @@ from collections import OrderedDict
 
 
 class Bil_layer(nn.Module):
-    def __init__(self, bil = 0, kernel_size = 5, sigma_color=0.1, color2 = 0.01, sigma_space=10., blur = 0, noise = 0.0, median = 0, sup = 0, JPEG = 0, device = "cuda", q = 75):
+    def __init__(self, bil = 0, kernel_size = 5, sigma_color=0.1, color2 = 0.01, sigma_space=10., blur = 0, noise = 0.0, median = 0, sup = 0, JPEG = 0, device = "cuda", q = 75, noise_first = True):
         super().__init__()
+        self.noise_first = noise_first
         self.bil = bil
         self.kernel_size = kernel_size
         self.sigma_color = sigma_color
@@ -44,17 +45,16 @@ class Bil_layer(nn.Module):
 
             
     def forward(self,x):
-        if(self.noise!=0):
-            n = torch.randn_like(x) 
-            n *= self.noise**0.5 
-            x = x + n
-            
-        
+        if(self.noise!=0 and self.noise_first):
+            x = x + torch.randn_like(x) * self.noise**0.5
+
         if(self.bil != 0):
             x = my_bil(x,self.kernel_size, self.sigma_color, self.space_Tensor0)
             for _ in range(self.bil-1):
                 x = my_bil(x,3, self.color2, self.space_Tensor1)
-            
+
+        if(self.noise!=0 and not self.noise_first):
+            x = x + torch.randn_like(x) * self.noise**0.5
 
         if(self.JPEG!=0):
             q = torch.ones(x.shape[0], device=self.device, requires_grad=True)*self.q
