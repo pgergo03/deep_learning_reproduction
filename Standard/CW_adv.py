@@ -1,3 +1,5 @@
+from reproducibility import make_generator, set_seed
+
 import torch
 from torchvision import models, transforms
 from torch.utils.data import DataLoader
@@ -15,8 +17,11 @@ parser.add_argument("--noise", type=float, default=0.032)
 parser.add_argument("--noise_first", type=int, default=1)
 parser.add_argument("--bil_m", type=int, default=10)
 parser.add_argument("--time", nargs="+", default=["14:44:15"])
+parser.add_argument("--run_tag", default=None)
 parser.add_argument("--c", type=float, nargs="+", default=[1,1.2,1.4,1.6,1.8,2])
+parser.add_argument("--seed", type=int, default=None)
 args = parser.parse_args()
+set_seed(args.seed)
 
 
 def test( model, device, test_loader):
@@ -62,13 +67,17 @@ def test( model, device, test_loader):
     return final_acc, f_l2
            
 now = datetime.datetime.now()
-real_time = str(now.time())[0:8]
+if args.seed is None:
+    real_time = str(now.time())[0:8]
+else:
+    run_parts = [f"seed_{args.seed}", args.run_tag, now.strftime("%H-%M-%S-%f")]
+    real_time = "_".join(part for part in run_parts if part)
 
 ########################################### Hyperparameters ###########################################
 batch_size=128
 
 #where we save the data
-path = str("./CW_adv/" + real_time)
+path = os.path.join("./CW_adv", real_time)
 
 #if a preprocessor layer is added in front of the NN
 preproc = bool(args.preproc)
@@ -138,7 +147,7 @@ device = (
 print(f"Using {device} device")
 
 cifartest = bil_CIFAR10(".",  noise=0, transform=test_transform, download=True, device=device, train=False)
-test_loader = DataLoader(cifartest, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(cifartest, batch_size=batch_size, shuffle=True, generator=make_generator(args.seed))
 
 model = models.efficientnet_b0().to(device)
 
@@ -169,7 +178,7 @@ for time in time_list:
     accuracies.append(acc)
     l2s.append(l2)
 
-path = str("./CW_adv/" + real_time)
+path = os.path.join("./CW_adv", real_time)
 
 os.mkdir(path)
 
@@ -181,4 +190,4 @@ l2_df.to_excel(excel_writer = path +"/l2.xlsx")
    
 
 with open(path + "/params.txt", "w") as f:
-    print("bil=", bil, " median=", med,  " blur=", blur, " noise=", noise, " color2=", color2," time=",time, " sup=", sup, "JPEG=", Jpeg, " q=", q,  file = f)
+    print("bil=", bil, " median=", med, " blur=", blur, " noise=", noise, " color2=", color2," time=",time, " sup=", sup, "JPEG=", Jpeg, " q=", q, " seed=", args.seed, file=f)

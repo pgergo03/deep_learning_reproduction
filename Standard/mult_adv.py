@@ -1,3 +1,5 @@
+from reproducibility import make_generator, set_seed
+
 import torch
 from torchvision import models, transforms
 import numpy as np
@@ -21,8 +23,11 @@ parser.add_argument("--noise_first", type=int, default=1)
 parser.add_argument("--color2", type=float, default=0.05)
 parser.add_argument("--bil_m", type=int, default=10)
 parser.add_argument("--time", default="14:44:15")
+parser.add_argument("--run_tag", default=None)
 parser.add_argument("--eps", type=float, nargs="+", default=list(np.array([0, .05, .1, .15, .2, .3, 0.5, 1])/10))
+parser.add_argument("--seed", type=int, default=None)
 args = parser.parse_args()
+set_seed(args.seed)
 
 class transform_layer(nn.Module):
     def __init__(self, transform):
@@ -94,10 +99,11 @@ def multi_test(model, device, test_loader, epsilon, bil_layer):
             correct = [(x+sum(final_true_mat[final_true_mat == True])).item() for x in correct]
 
     else:
+        attack_seed = {} if args.seed is None else {"seed": args.seed}
         att0 = ta.FGSM(model, eps=epsilon)
-        att1 = ta.APGD(model, eps=epsilon)
+        att1 = ta.APGD(model, eps=epsilon, **attack_seed)
         att2 = ta.EOTPGD(model, eps=epsilon)
-        att3 = ta.APGD(model,norm='L2', eps=epsilon*17)
+        att3 = ta.APGD(model,norm='L2', eps=epsilon*17, **attack_seed)
         Bpda = BPDAattack(model = model, defense= bil_layer, device=device, epsilon=epsilon, learning_rate = 2/255)
 
         att_l = [att0, att1, att2, att3]
@@ -137,13 +143,17 @@ def multi_test(model, device, test_loader, epsilon, bil_layer):
     return final_acc
            
 now = datetime.datetime.now()
-real_time = str(now.time())[0:8]
+if args.seed is None:
+    real_time = str(now.time())[0:8]
+else:
+    run_parts = [f"seed_{args.seed}", args.run_tag, now.strftime("%H-%M-%S-%f")]
+    real_time = "_".join(part for part in run_parts if part)
 
 ########################################### Hyperparameters ###########################################
 batch_size=128
 
 #where we save the data
-path = str("./mult_adv/" + real_time)
+path = os.path.join("./mult_adv", real_time)
 
 #if a preprocessor layer is added in front of the NN
 preproc = bool(args.preproc)
@@ -212,7 +222,7 @@ device = (
 print(f"Using {device} device")
 
 cifartest = bil_CIFAR10(".",  noise=0, transform=test_transform, download=True, device=device, train=False)
-test_loader = DataLoader(cifartest, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(cifartest, batch_size=batch_size, shuffle=True, generator=make_generator(args.seed))
 
 model = models.efficientnet_b0().to(device)
 
@@ -240,7 +250,7 @@ for eps in epsilons:
     accuracies.append(acc)
 
 #where we save the model
-path = str("./mult_adv/" + real_time)
+path = os.path.join("./mult_adv", real_time)
 
 os.mkdir(path)
 
@@ -249,4 +259,4 @@ acc_df.to_excel(excel_writer = path +"/acc.xlsx")
    
 
 with open(path + "/params.txt", "w") as f:
-    print("bil=", bil, " median=", med, " blur=", blur, " noise=", noise, " color2=", color2," time=",time, " sup=", sup, "JPEG=", Jpeg, " q=", q,  file = f)
+    print("bil=", bil, " median=", med, " blur=", blur, " noise=", noise, " color2=", color2," time=",time, " sup=", sup, "JPEG=", Jpeg, " q=", q, " seed=", args.seed, file=f)

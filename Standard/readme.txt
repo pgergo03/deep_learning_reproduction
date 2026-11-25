@@ -4,6 +4,10 @@ And all hyperparameters should be described.
 To run any file use:
 python3 file_name.py
 
+On Windows, run Table 1 with a fixed seed using:
+run_table1.bat -Seed 123
+Reusing a seed is reproducible on the same software and device. Models, results, evaluation folders, logs, and the Table 1 report include a seed_# label. Existing models for the same seed are skipped; remove the matching model and result artifacts before a fresh training comparison. PyTorch may warn if an operation lacks a deterministic implementation.
+
 To train the standard CNN with or without preprocessor use train.py. 
 This will also automatically test against noise for the last 10 runs of training.
 The model will be saved in the folder Models/ as its time stamp with the bilateral filter amount in front and the noise test results in the folder Results/time/.

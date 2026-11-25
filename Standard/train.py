@@ -1,4 +1,6 @@
 
+from reproducibility import make_generator, set_seed
+
 import numpy as np
 import torch
 from torchvision import  models, transforms
@@ -17,7 +19,9 @@ parser.add_argument("--noise", type=float, default=0.032)
 parser.add_argument("--noise_first", type=int, default=1)
 parser.add_argument("--epochs", type=int, default=80)
 parser.add_argument("--tag", default=None, help="model name suffix instead of the timestamp")
+parser.add_argument("--seed", type=int, default=None)
 args = parser.parse_args()
+set_seed(args.seed)
 
 
 def run_ef03():
@@ -141,7 +145,7 @@ def run_ef03():
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     cifartrain = bil_CIFAR10(".",  noise=0, download=True, transform=test_transform, device=device)
-    train_dataloader = DataLoader(cifartrain, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(cifartrain, batch_size=batch_size, shuffle=True, generator=make_generator(args.seed))
 
     cifartests = [bil_CIFAR10(".", noise=n, train=False, download=True, transform=test_transform) for n in noises]
     test_dataloaders = [DataLoader(d, batch_size=batch_size) for d in cifartests]
@@ -239,7 +243,7 @@ def run_ef03():
 
     torch.save(model.state_dict(), path_to_model)
     with open(path + "/params.txt", "w") as f:
-        print("bil=", bil, " median=", med, " blur=", blur, " noise=", noise, " color2=", color2," time=",time, " sup=", sup, "JPEG=", Jpeg, " q=", q,  file = f)
+        print("bil=", bil, " median=", med, " blur=", blur, " noise=", noise, " color2=", color2," time=",time, " sup=", sup, "JPEG=", Jpeg, " q=", q, " seed=", args.seed, file=f)
 
 
 run_ef03()
