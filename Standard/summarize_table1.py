@@ -24,7 +24,12 @@ seed_suffix = f"_seed_{args.seed}" if args.seed is not None else ""
 
 
 def last_list(path, prefix):
-    lines = [l for l in open(path) if l.startswith(prefix)]
+    with open(path, "rb") as log:
+        contents = log.read()
+    encoding = "utf-16" if contents.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
+    lines = [line for line in contents.decode(encoding).splitlines() if line.startswith(prefix)]
+    if not lines:
+        raise ValueError(f"No log line starting with {prefix!r} found in {path}")
     return ast.literal_eval(re.sub(r"np\.float64\((.*?)\)", r"\1", lines[-1].split("=", 1)[1].strip()))
 
 
@@ -50,5 +55,6 @@ for name, fn in [("linear gain", lambda d, i: d["bil"][i] + d["noise"][i] - 2 * 
 
 out = "Accuracy in %, ours (paper). Clean is mean±std over the last 10 epochs.\n\n" + "\n".join(lines) + "\n"
 report_name = f"table1{seed_suffix}.md"
-open(report_name, "w").write(out)
+with open(report_name, "w", encoding="utf-8", newline="\n") as report:
+    report.write(out)
 print(out)
